@@ -64,6 +64,8 @@ void*           kalloc(void);
 void            kfree(void *);
 void            kinit(void);
 
+extern int page_refcnt[32*1024];   //128*1024*1024/4*1024
+
 // log.c
 void            initlog(int, struct superblock*);
 void            log_write(struct buf*);
@@ -159,6 +161,7 @@ void            kvminithart(void);
 uint64          kvmpa(uint64);
 void            kvmmap(uint64, uint64, uint64, int);
 int             mappages(pagetable_t, uint64, uint64, uint64, int);
+int             mappages_cow(pagetable_t , uint64 , uint64 , uint64 , int );
 pagetable_t     uvmcreate(void);
 void            uvminit(pagetable_t, uchar *, uint);
 uint64          uvmalloc(pagetable_t, uint64, uint64);
@@ -185,3 +188,5 @@ void            virtio_disk_intr(void);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
+
+#define PA2CNT(pa) ((uint64)pa-KERNBASE)/PGSIZE 

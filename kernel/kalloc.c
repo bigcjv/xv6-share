@@ -13,6 +13,9 @@ void freerange(void *pa_start, void *pa_end);
 
 extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
+int page_refcnt[32*1024];   //128*1024*1024/4*1024
+
+
 
 struct run {
   struct run *next;
@@ -59,6 +62,9 @@ kfree(void *pa)
   acquire(&kmem.lock);
   r->next = kmem.freelist;
   kmem.freelist = r;
+
+  page_refcnt[PA2CNT(pa)]=0;
+  
   release(&kmem.lock);
 }
 
@@ -78,5 +84,10 @@ kalloc(void)
 
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
+  
+  if(r)
+  {
+      page_refcnt[PA2CNT(r)]=1;
+  }
   return (void*)r;
 }
