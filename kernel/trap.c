@@ -80,17 +80,34 @@ usertrap(void)
           panic("uvmcopy: pte should exist");
         if((*pte & PTE_V) == 0)
           panic("uvmcopy: page not present");
-        pa = PTE2PA(*pte);
-        flags = PTE_FLAGS(*pte);
+        if(*pte&PTE_C)
+        {
+          pa = PTE2PA(*pte);
+          flags = PTE_FLAGS(*pte)|PTE_W;
+          flags&=~(PTE_C);
 
-        page_refcnt[PA2CNT(pa)]-=1;
 
-        if((mem = kalloc()) == 0)
-          goto err;
-        memmove(mem, (char*)pa, PGSIZE);
-        if(mappages_cow(p->pagetable, i, PGSIZE, (uint64)mem, flags) != 0){
-          kfree(mem);
-          goto err;
+         acquire(&cowcnt.lock);
+         cowcnt.pagecnt[PA2CNT(pa)]-=1;
+         release(&cowcnt.lock);
+
+          if(cowcnt.pagecnt[PA2CNT(pa)]==1)
+          {
+            *pte|=PTE_W;
+            *pte&=~(PTE_C);
+          }
+
+          if((mem = kalloc()) == 0)
+            goto err;
+          memmove(mem, (char*)pa, PGSIZE);
+          if(mappages(p->pagetable, i, PGSIZE, (uint64)mem, flags) != 0){
+            kfree(mem);
+            goto err;
+          }
+        }
+        else 
+        {
+           goto err;
         }
     }
     err:
