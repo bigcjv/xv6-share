@@ -28,7 +28,8 @@ struct {
   struct run *freelist;
 } kmem;
 
-int  cowcnt[32*1024]={0};
+
+int  cowcnt[(PHYSTOP-KERNBASE)/PGSIZE]={0};  //32*1024
 
 
 
@@ -105,7 +106,9 @@ kalloc(void)
   
   if(r)
   {
-      add_count((uint64)r,1);
+    acquire(&kmem.lock);
+    cowcnt[PA2CNT(r)]=1;
+    release(&kmem.lock);
   }
   return (void*)r;
 }
