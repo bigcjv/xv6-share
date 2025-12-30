@@ -9,7 +9,7 @@ struct sleeplock;
 struct stat;
 struct superblock;
 
-struct cowcnt_t;
+
 
 // bio.c
 void            binit(void);
@@ -66,9 +66,11 @@ void*           kalloc(void);
 void            kfree(void *);
 void            kinit(void);
 
+void add_count(uint64 pa, int num);
+int handle_page(uint64 va, pagetable_t pgtbl);
 
 
-extern struct cowcnt_t cowcnt;   //128*1024*1024/4*1024
+
 
 // log.c
 void            initlog(int, struct superblock*);
