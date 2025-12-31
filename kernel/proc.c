@@ -508,16 +508,16 @@ sched(void)
 
   if(!holding(&p->lock))
     panic("sched p->lock");
-  if(mycpu()->noff != 1)
+  if(mycpu()->noff != 1)   //嵌套锁检查
     panic("sched locks");
   if(p->state == RUNNING)
     panic("sched running");
-  if(intr_get())
+  if(intr_get()) 
     panic("sched interruptible");
 
-  intena = mycpu()->intena;
+  intena = mycpu()->intena;//保存当前cpu的中断状态
   swtch(&p->context, &mycpu()->context);
-  mycpu()->intena = intena;
+  mycpu()->intena = intena;  
 }
 
 // Give up the CPU for one scheduling round.
