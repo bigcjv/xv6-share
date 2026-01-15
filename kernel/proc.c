@@ -67,7 +67,7 @@ mycpu(void) {
 struct proc*
 myproc(void) {
   push_off();
-  struct cpu *c = mycpu();
+  struct cpu *c = mycpu();  //it's only safe to call it and use its result when interrupts are turned off
   struct proc *p = c->proc;
   pop_off();
   return p;

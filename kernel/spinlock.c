@@ -48,7 +48,7 @@ initlock(struct spinlock *lk, char *name)
 {
   lk->name = name;
   lk->locked = 0;
-  lk->cpu = 0;
+  lk->cpu = 0;   //表示未其它cpu占有
 #ifdef LAB_LOCK
   lk->nts = 0;
   lk->n = 0;
