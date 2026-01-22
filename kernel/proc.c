@@ -73,6 +73,16 @@ myproc(void) {
   return p;
 }
 
+int get_cpuid(void)
+{
+    int id;
+    push_off();
+    id= cpuid();
+    pop_off();
+    return id;
+}
+
+
 int
 allocpid() {
   int pid;
