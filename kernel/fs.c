@@ -407,28 +407,28 @@ bmap(struct inode *ip, uint bn)
   bn-=NINDIRECT;
   if(bn<DOUBLEINDIRECT)
   {
-    int b_first=bn/NINDIRECT;
-    int b_second=bn%NINDIRECT;
+    int index_first=bn/NINDIRECT;
+    int index_second=bn%NINDIRECT;
 
     if((addr = ip->addrs[NDIRECTANDSIG]) == 0)
       ip->addrs[NDIRECTANDSIG] = addr = balloc(ip->dev);
-    
+     //第一级block遍历
     bp_first = bread(ip->dev, addr);
     a0 = (uint*)bp_first->data;
-    if((addr = a0[b_first]) == 0){
-      a0[b_first] = addr = balloc(ip->dev);
+    if((addr = a0[index_first]) == 0){
+      a0[index_first] = addr = balloc(ip->dev);
       log_write(bp_first);
     }
-   
+    brelse(bp_first);   // 读写完磁盘块，这里即可释放 bp_first
+   //第二级block遍历
     bp_second=bread(ip->dev, addr);
     a1=(uint*)bp_second->data;
-    if((addr = a1[b_second]) == 0){
-      a1[b_second] = addr = balloc(ip->dev);
+    if((addr = a1[index_second]) == 0){
+      a1[index_second] = addr = balloc(ip->dev);
       log_write(bp_second);
     }
 
     brelse(bp_second);
-    brelse(bp_first);   //Don't forget to brelse() each block that you bread().
 
     return addr;
   }
@@ -466,6 +466,7 @@ itrunc(struct inode *ip)
   uint*a0,*a1;
   struct buf *bp_first,*bp_second;
 
+//释放double indirect
   if(ip->addrs[NDIRECTANDSIG]){
     bp_first = bread(ip->dev, ip->addrs[NDIRECTANDSIG]);
     a0 = (uint*)bp_first->data;
@@ -477,14 +478,14 @@ itrunc(struct inode *ip)
         {
             a1 = (uint*)bp_second->data;
             if(a1[k])
-              bfree(ip->dev, a1[k]);
+              bfree(ip->dev, a1[k]);  //释放第二级
         }
         brelse(bp_second);
-        bfree(ip->dev, a0[j]);
+        bfree(ip->dev, a0[j]);   //释放第一级
       }
     }
     brelse(bp_first);
-    bfree(ip->dev, ip->addrs[NDIRECTANDSIG]);
+    bfree(ip->dev, ip->addrs[NDIRECTANDSIG]);  //释放第13个 double indirect块
     ip->addrs[NDIRECTANDSIG] = 0;
   }
 
