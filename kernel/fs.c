@@ -60,7 +60,7 @@ bzero(int dev, int bno)
 
 // Blocks.
 
-// Allocate a zeroed disk block.
+// Allocate a zeroed disk block.  返回磁盘号
 static uint
 balloc(uint dev)
 {
@@ -393,11 +393,43 @@ bmap(struct inode *ip, uint bn)
       ip->addrs[NDIRECT] = addr = balloc(ip->dev);
     bp = bread(ip->dev, addr);
     a = (uint*)bp->data;
-    if((addr = a[bn]) == 0){
+    if((addr = a[bn]) == 0){ 
       a[bn] = addr = balloc(ip->dev);
       log_write(bp);
     }
     brelse(bp);
+    return addr;
+  }
+
+  uint*a0,*a1;
+  
+  struct buf *bp_first,*bp_second;
+  bn-=NINDIRECT;
+  if(bn<DOUBLEINDIRECT)
+  {
+    int b_first=bn/NINDIRECT;
+    int b_second=bn%NINDIRECT;
+
+    if((addr = ip->addrs[NDIRECTANDSIG]) == 0)
+      ip->addrs[NDIRECTANDSIG] = addr = balloc(ip->dev);
+    
+    bp_first = bread(ip->dev, addr);
+    a0 = (uint*)bp_first->data;
+    if((addr = a0[b_first]) == 0){
+      a0[b_first] = addr = balloc(ip->dev);
+      log_write(bp_first);
+    }
+   
+    bp_second=bread(ip->dev, addr);
+    a1=(uint*)bp_second->data;
+    if((addr = a1[b_second]) == 0){
+      a1[b_second] = addr = balloc(ip->dev);
+      log_write(bp_second);
+    }
+
+    brelse(bp_second);
+    brelse(bp_first);   //Don't forget to brelse() each block that you bread().
+
     return addr;
   }
 
@@ -431,10 +463,37 @@ itrunc(struct inode *ip)
     bfree(ip->dev, ip->addrs[NDIRECT]);
     ip->addrs[NDIRECT] = 0;
   }
+  uint*a0,*a1;
+  struct buf *bp_first,*bp_second;
+
+  if(ip->addrs[NDIRECTANDSIG]){
+    bp_first = bread(ip->dev, ip->addrs[NDIRECTANDSIG]);
+    a0 = (uint*)bp_first->data;
+    for(j = 0; j < NINDIRECT; j++){
+      if(a0[j])
+      {
+        bp_second = bread(ip->dev, a0[j]);
+        for(int k = 0; k < NINDIRECT; k++)
+        {
+            a1 = (uint*)bp_second->data;
+            if(a1[k])
+              bfree(ip->dev, a1[k]);
+        }
+        brelse(bp_second);
+        bfree(ip->dev, a0[j]);
+      }
+    }
+    brelse(bp_first);
+    bfree(ip->dev, ip->addrs[NDIRECTANDSIG]);
+    ip->addrs[NDIRECTANDSIG] = 0;
+  }
 
   ip->size = 0;
   iupdate(ip);
 }
+
+
+
 
 // Copy stat information from inode.
 // Caller must hold ip->lock.
