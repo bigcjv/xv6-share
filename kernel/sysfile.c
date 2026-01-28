@@ -16,6 +16,7 @@
 #include "file.h"
 #include "fcntl.h"
 
+static struct inode*create(char *path, short type, short major, short minor);
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
 static int
@@ -165,6 +166,37 @@ bad:
   return -1;
 }
 
+//create a new symbolic link at path that refers to target
+uint64
+sys_symlink(void)
+{
+  char target[MAXPATH], path[MAXPATH];
+  struct inode *symip;
+
+  if(argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0)
+    return -1;
+
+  begin_op();
+
+  //为软链接创建inode，type为T_SYMLINK
+
+  if((symip = create(path, T_SYMLINK, 0, 0)) == 0)
+  {
+    end_op();
+    return -1;
+  }
+  // store the target path of a symbolic link
+  int r;
+ //user_src=0，因为 argstr() 已经把用户字符串拷到内核数组 target 里了。
+  if ((r = writei(symip, 0,(uint64)target,0, strlen(target)+1)) < 0)
+    panic("sys_symlink writei fail");
+  
+  iunlockput(symip);
+  end_op();
+ 
+  return 0;
+}
+
 // Is the directory dp empty except for "." and ".." ?
 static int
 isdirempty(struct inode *dp)
@@ -249,11 +281,11 @@ create(char *path, short type, short major, short minor)
 
   ilock(dp);
 
-  if((ip = dirlookup(dp, name, 0)) != 0){
+  if((ip = dirlookup(dp, name, 0)) != 0){  //检查目录里是否已存在
     iunlockput(dp);
     ilock(ip);
     if(type == T_FILE && (ip->type == T_FILE || ip->type == T_DEVICE))
-      return ip;
+      return ip;  //如果存在，返回该名字对应的 inode 指针 ip
     iunlockput(ip);
     return 0;
   }
@@ -292,13 +324,16 @@ sys_open(void)
   struct inode *ip;
   int n;
 
+
+
   if((n = argstr(0, path, MAXPATH)) < 0 || argint(1, &omode) < 0)
     return -1;
 
   begin_op();
 
+
   if(omode & O_CREATE){
-    ip = create(path, T_FILE, 0, 0);
+    ip = create(path, T_FILE, 0, 0);  //create返回的ip是加锁的
     if(ip == 0){
       end_op();
       return -1;
@@ -313,6 +348,35 @@ sys_open(void)
       iunlockput(ip);
       end_op();
       return -1;
+    }
+  }
+
+  if(!(omode & O_NOFOLLOW))
+  {
+    int symlink_depth=0;
+    while((ip->type ==T_SYMLINK))
+    {
+      if(symlink_depth++>=MAXSYMLINK)
+      {
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
+      memset(path,0,sizeof(path));
+      if((readi(ip, 0, (uint64)path, 0, MAXPATH)) < 0)
+      {
+         iunlockput(ip);
+         end_op();
+         return -1;
+      }
+
+      // 释放当前 symlink inode
+      iunlockput(ip);
+      if((ip = namei(path)) == 0){
+        end_op();
+        return -1;
+      }
+      ilock(ip);
     }
   }
 
@@ -337,6 +401,7 @@ sys_open(void)
     f->type = FD_INODE;
     f->off = 0;
   }
+
   f->ip = ip;
   f->readable = !(omode & O_WRONLY);
   f->writable = (omode & O_WRONLY) || (omode & O_RDWR);

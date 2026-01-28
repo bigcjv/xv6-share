@@ -553,11 +553,12 @@ writei(struct inode *ip, int user_src, uint64 src, uint off, uint n)
     return -1;
   if(off + n > MAXFILE*BSIZE)
     return -1;
-
+ //n bytes 数据拷贝到bp->data
   for(tot=0; tot<n; tot+=m, off+=m, src+=m){
     bp = bread(ip->dev, bmap(ip, off/BSIZE));
     m = min(n - tot, BSIZE - off%BSIZE);
-    if(either_copyin(bp->data + (off % BSIZE), user_src, src, m) == -1) {
+   
+    if(either_copyin(bp->data + (off % BSIZE), user_src, src, m) == -1) {  
       brelse(bp);
       break;
     }
@@ -573,7 +574,7 @@ writei(struct inode *ip, int user_src, uint64 src, uint off, uint n)
   // block to ip->addrs[].
   iupdate(ip);
 
-  return tot;
+  return tot;  //返回的是实际写入的字节数
 }
 
 // Directories

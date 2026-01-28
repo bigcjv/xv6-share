@@ -42,7 +42,7 @@ cleanup(void)
 
 // stat a symbolic link using O_NOFOLLOW
 static int
-stat_slink(char *pn, struct stat *st)
+stat_slink(char *pn, struct stat *st)   //获取符号链接的 stat 信息,type、inum、size等
 {
   int fd = open(pn, O_RDONLY | O_NOFOLLOW);
   if(fd < 0)
